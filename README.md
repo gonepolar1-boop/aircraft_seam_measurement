@@ -87,6 +87,20 @@ python scripts/train/run_loocv_experiments.py
 Training configuration (input size, loss weights, patch sampling, etc.) lives
 in `src/seam_training/config.json`.
 
+## Tests
+
+A small pytest suite covers the pure-numpy utilities (reference-frame
+geometry, ASCII-PCD loader). It runs without torch / opencv / open3d so it
+is safe to execute in a minimal CI environment.
+
+```bash
+pip install numpy pytest
+pytest
+```
+
+See `.github/workflows/ci.yml` for the configuration that runs on push /
+pull request.
+
 ## Data / model artefacts
 
 `data/`, `outputs/`, and `app/` are intentionally git-ignored. The repository

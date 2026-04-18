@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install test dependencies
+        # Tests are scoped to pure-numpy utilities so CI can stay lightweight
+        # (no torch / opencv / open3d). Full integration tests should be run
+        # locally with the full requirements.txt installed.
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pytest ruff
+
+      - name: Ruff (tests + new code only)
+        run: ruff check tests
+
+      - name: Run pytest
+        run: pytest
