@@ -1,2 +1,15 @@
-执行命令备份：
-python -m src.pipeline.__main__ --pcd-path D:\MyProgram\aircraft_seam_measurement\data\process\manual_crop\1\crop.pcd --checkpoint-path D:\MyProgram\aircraft_seam_measurement\outputs\model\03272222_attention_unet\checkpoints\latest.pth --show-3d-viewer
+# Pipeline CLI quick reference
+
+Run from the project root. Replace the paths below with those for your
+environment (the examples use forward slashes, but Windows-style paths also
+work).
+
+```bash
+python -m src.pipeline \
+  --pcd-path        data/process/manual_crop/1/crop.pcd \
+  --checkpoint-path outputs/model/<run_id>/checkpoints/latest.pth \
+  --show-3d-viewer
+```
+
+See `python -m src.pipeline --help` for the full list of flags, and the
+top-level `README.md` for an overview of the pipeline and output artefacts.

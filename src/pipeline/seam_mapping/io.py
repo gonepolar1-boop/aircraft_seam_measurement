@@ -78,7 +78,12 @@ def load_point_map_from_pcd(point_map_path: str | Path) -> np.ndarray:
             raise ValueError(f"PCD file {point_map_path} is missing '{axis}' in FIELDS.")
         xyz_indices.append(field_names.index(axis))
 
-    flat_values = np.fromstring(body, sep=" ", dtype=np.float32)
+    # ``np.fromstring`` is deprecated; ``np.fromiter`` over ``body.split()``
+    # gives the same parse of whitespace-separated ASCII floats.
+    flat_values = np.fromiter(
+        (float(token) for token in body.split()),
+        dtype=np.float32,
+    )
     expected_values = points * num_fields
     if flat_values.size != expected_values:
         raise ValueError(

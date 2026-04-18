@@ -1,0 +1,16 @@
+# Core runtime dependencies for the measurement pipeline and training code.
+# Versions are lower bounds known to work; adjust as needed for your platform.
+
+numpy>=1.24
+opencv-python>=4.8
+matplotlib>=3.7
+tqdm>=4.65
+
+# Deep-learning stack. Install a torch build matching your CUDA toolkit from
+# https://pytorch.org/get-started/locally/ instead of relying on this pin if
+# you need GPU support.
+torch>=2.1
+
+# Optional: only required when launching the Open3D viewer
+# (scripts/draw/show_crop_pcd_open3d.py and src/pipeline/viewer3d.py).
+open3d>=0.17
