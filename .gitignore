@@ -1,0 +1,27 @@
+.vscode/
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Local runtime and experiment outputs
+# Vendor SDK stays local; only document customizations in repo notes.
+app/
+data/
+outputs/
+*.log
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+
+# Visual Studio local files
+.vs/
+obj/
+*.suo
+*.user
+*.vsidx
+*.ipch

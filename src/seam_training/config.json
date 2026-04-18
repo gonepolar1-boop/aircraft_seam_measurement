@@ -1,0 +1,56 @@
+{
+  "model_input_size": [1032, 1236],
+  "training": {
+    "resume": true,
+    "use_patch_sampling": true,
+    "seed": 42,
+    "train_steps": 128,
+    "batch_size": 1,
+    "lr": 0.0002,
+    "epochs": 1,
+    "num_workers": 2
+  },
+  "preview": {
+    "preview_samples": 5,
+    "preview_threshold": 0.5
+  },
+  "model": {
+    "model_name": "attention_unet",
+    "backup":"unet",
+    "model_base_channels": 32
+  },
+  "loss": {
+    "loss_pos_weight": 3.0,
+    "loss_bce_weight": 1.0,
+    "loss_dice_weight": 1.0
+  },
+  "patch_sampling": {
+    "min_size_ratio_to_model_input": 0.5,
+    "positive_only": true,
+    "min_positive_pixels": 1,
+    "sampling_attempts": 8,
+    "center_jitter": 48
+  },
+  "augmentation": {
+    "rotate_prob": 0.7,
+    "rotate_deg_range": [-180.0, 180.0],
+    "rotate_scale_range": [0.92, 1.08],
+    "flip_prob": 0.5,
+    "flip_codes": [-1, 0, 1],
+    "affine_prob": 0.7,
+    "affine_shear_range": [-0.05, 0.05],
+    "affine_shift_range": [-18.0, 18.0],
+    "brightness_prob": 0.8,
+    "brightness_beta_range": [-0.22, 0.22],
+    "contrast_prob": 0.8,
+    "contrast_alpha_range": [0.75, 1.35],
+    "noise_prob": 0.8,
+    "noise_std_range": [4.0, 12.0],
+    "blur_prob": 0.5,
+    "blur_kernel_choices": [[3, 3], [5, 5]],
+    "blur_sigma_range": [0.8, 1.8],
+    "illumination_prob": 0.6,
+    "illumination_strength_range": [18.0, 42.0],
+    "illumination_modes": ["x", "y", "xy"]
+  }
+}
