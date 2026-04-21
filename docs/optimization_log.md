@@ -267,3 +267,27 @@ N=4951），全走 sliding-window loop。micro-bench：
 
 ---
 
+## P9 — `count_neighbors` scatter 用 `np.bincount` 替代 `np.add.at`
+
+**发现**：P8 之后进一步拆开 count_neighbors 的时间构成，query_pairs
+只花 ~3.4 ms，`np.add.at(counts, pairs[:,i], 1)` 这一步独占 ~9 ms。
+原因：`np.add.at` 是通用 unbuffered ufunc 入口，Python 层循环处理
+重复下标，不能向量化；对 80k+ pairs 特别吃亏。
+
+**改法**：用 `np.bincount(pairs[:, 0], minlength=n) +
+np.bincount(pairs[:, 1], minlength=n)`。bincount 是专为此场景做的
+全 C 实现。micro-bench 同一组 pairs：`add.at` 8.26 ms →
+`2×bincount` 0.19 ms，**44×**。
+
+| 项 | P8 | **P9** |
+|---|---|---|
+| 总耗时 | 36.3 s | **33.0 s (-9%)** ✅ |
+| gap_mean / std | 15.327 / 0.1920 | 15.327 / 0.1920 |
+| flush_mean / std | 1.374 / 0.1644 | 1.374 / 0.1638 |
+| 有效截面 | 1887/1893 | 1887/1893 |
+
+**判定：保留**。速度 9% 净提升，精度 bit-essentially-identical。累计
+89.3 s → 33.0 s，**总耗时降 63%**。
+
+---
+
