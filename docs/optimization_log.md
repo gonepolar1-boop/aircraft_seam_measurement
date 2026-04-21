@@ -114,3 +114,31 @@ segment 内每个坐标（px, py, x, y）做 `polyfit(u, coord, 1)` 线性拟合
 
 ---
 
+## P4 — RANSAC 鲁棒拟合替换 polyfit
+
+**改动**：在 `_fit_top_surface_line` 和 `_fit_segment_surface_line` 里
+用自写的 2 点 RANSAC（60 次迭代、全向量化）替换 `np.polyfit`。对内点集
+再用一次 `polyfit` 做精修；全部失败退回 polyfit。Inlier 容差：初始 fit
+用半个 band_height，segment fit 用 0.15 mm。RNG 模块级 seed=42
+保证可复现。
+
+| 项 | P3 | **P4** |
+|---|---|---|
+| 总耗时 | 86.1 s | **92.3 s (+7%)** |
+| gap_mean | 15.320 | 15.327 |
+| gap_std | 0.1915 | 0.1921 （≈ 持平） |
+| flush_mean | 1.415 | 1.374 |
+| **flush_std** | 0.1792 | **0.1631 (-9%)** ✅ |
+| 有效截面 | 1887/1893 | 1887/1893 |
+
+尝试过 Python for-loop 和向量化 K×N 残差矩阵两种实现，向量化的
+bench 结果相同（≈92 s），证明耗时来自**真实 RANSAC 工作量**（每截面
+双侧 ×2 次 fit × 60 iter × ~20 残差 = 几十万次 numpy 操作 × 1893
+section ≈ 4-5 s），不是 loop 开销。
+
+**判定：保留**。trade-off 明显——flush 重复性提升 16 μm 对"±0.05 mm"
+这一核心精度指标是实打实的正收益；7 s 速度代价在单帧 ~100 s 量级的
+精度管线里可接受。
+
+---
+

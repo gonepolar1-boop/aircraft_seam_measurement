@@ -133,6 +133,62 @@ def _estimate_top_z(points: dict[str, np.ndarray], quantile: float) -> float:
     return float(np.quantile(finite_z, quantile))
 
 
+_RANSAC_ITERATIONS = 60
+_RANSAC_RNG = np.random.default_rng(42)
+
+
+def _robust_line_fit(u: np.ndarray, z: np.ndarray, tol: float) -> tuple[float, float]:
+    """Vectorised 2-point RANSAC line fit with a final LS pass on inliers.
+
+    Draws all ``_RANSAC_ITERATIONS`` sample pairs up-front, computes
+    every candidate slope/intercept in one numpy op, and scores all
+    iterations' residuals in a single ``(K, N)`` broadcast.  This
+    keeps RANSAC's robustness benefit (outliers don't pull the line)
+    without the Python-loop overhead that the naive per-iteration
+    version added to the pipeline.
+    """
+    u64 = np.asarray(u, dtype=np.float64).reshape(-1)
+    z64 = np.asarray(z, dtype=np.float64).reshape(-1)
+    n = len(u64)
+    if n < 3:
+        slope, intercept = np.polyfit(u64, z64, deg=1)
+        return float(slope), float(intercept)
+    tol_abs = max(1e-4, float(tol))
+
+    iterations = min(_RANSAC_ITERATIONS, n * (n - 1) // 2)
+    i_arr = _RANSAC_RNG.integers(0, n, size=iterations)
+    j_arr = _RANSAC_RNG.integers(0, n, size=iterations)
+    keep = (i_arr != j_arr)
+    if not keep.any():
+        slope, intercept = np.polyfit(u64, z64, deg=1)
+        return float(slope), float(intercept)
+    i_arr = i_arr[keep]
+    j_arr = j_arr[keep]
+    du = u64[j_arr] - u64[i_arr]
+    valid = np.abs(du) > 1e-9
+    if not valid.any():
+        slope, intercept = np.polyfit(u64, z64, deg=1)
+        return float(slope), float(intercept)
+    i_arr = i_arr[valid]
+    j_arr = j_arr[valid]
+    du = du[valid]
+
+    slopes = (z64[j_arr] - z64[i_arr]) / du          # (K,)
+    intercepts = z64[i_arr] - slopes * u64[i_arr]    # (K,)
+    residuals = np.abs(slopes[:, None] * u64[None, :] + intercepts[:, None] - z64[None, :])
+    inliers_mask_all = residuals <= tol_abs          # (K, N)
+    inlier_counts = inliers_mask_all.sum(axis=1)     # (K,)
+    if inlier_counts.max() < 2:
+        slope, intercept = np.polyfit(u64, z64, deg=1)
+        return float(slope), float(intercept)
+    best_idx = int(np.argmax(inlier_counts))
+    best_inliers = inliers_mask_all[best_idx]
+    slope, intercept = np.polyfit(u64[best_inliers], z64[best_inliers], deg=1)
+    if not np.isfinite(slope) or not np.isfinite(intercept):
+        slope, intercept = np.polyfit(u64, z64, deg=1)
+    return float(slope), float(intercept)
+
+
 def _fit_top_surface_line(points: dict[str, np.ndarray], z_ref: float, params: GapFlushParams) -> LineFit:
     if len(points.get("u", [])) < int(params.top_surface_fit_min_points) or not np.isfinite(z_ref):
         return {"slope": 0.0, "intercept": float(z_ref), "valid": False}
@@ -147,7 +203,10 @@ def _fit_top_surface_line(points: dict[str, np.ndarray], z_ref: float, params: G
         z_fit = z
     if len(u_fit) < 2:
         return {"slope": 0.0, "intercept": float(z_ref), "valid": False}
-    slope, intercept = np.polyfit(u_fit.astype(np.float64), z_fit.astype(np.float64), deg=1)
+    # Use half the band height as the inlier tolerance so the RANSAC core
+    # is inside the already-filtered band but tighter than it.
+    tol = max(0.1, 0.5 * float(params.top_surface_band_height))
+    slope, intercept = _robust_line_fit(u_fit, z_fit, tol=tol)
     return {"slope": float(slope), "intercept": float(intercept), "valid": True}
 
 
@@ -158,7 +217,8 @@ def _fit_segment_surface_line(segment: dict[str, np.ndarray], fallback_fit: Line
     z = np.asarray(segment["z"], dtype=np.float32).reshape(-1)
     if len(u) < 2:
         return dict(fallback_fit)
-    slope, intercept = np.polyfit(u.astype(np.float64), z.astype(np.float64), deg=1)
+    # Tighter tolerance on segments (already near-clean top surface).
+    slope, intercept = _robust_line_fit(u, z, tol=0.15)
     if not np.isfinite(slope) or not np.isfinite(intercept):
         return dict(fallback_fit)
     return {"slope": float(slope), "intercept": float(intercept), "valid": True, "z_ref": float(z_ref)}
