@@ -291,3 +291,52 @@ np.bincount(pairs[:, 1], minlength=n)`。bincount 是专为此场景做的
 
 ---
 
+## Audit 第四轮 — 收益曲线收敛
+
+P9 之后继续 profile `extract_sections_fast` 和 `detect_top_surface_edges`：
+
+- `searchsorted` 在多线程下 cProfile 的记账仍异常（显示 29.5 s，
+  实际 micro-bench 7572 次 searchsorted 在 1.2M 数组上只要 13 ms，
+  差 2000×），这是 cProfile 对共享 C 函数在多线程下的归因 bug，
+  不代表真实 CPU 负载。
+- `_build_section_from_slab` 和 `_build_edge_point_from_model` 都
+  是"每 section 几十个小 numpy 调用+一次 dict 构建"的结构，Python
+  解释器开销成为硬底，再压需要 Cython / numba（对毕设过重）。
+- count_neighbors 的 cKDTree + bincount 组合已经接近最优，再向
+  下要么写 C 扩展，要么用 JIT。
+
+**决定不再强求**，P9 后停手。剩下 33 s/帧由 Python 解释器 + GIL
+切换 + 每帧 ~8000 条 dict/ndarray 小操作支配，属于 cost 底板。
+
+---
+
+## 最终总结（pre-P0 baseline → post-P9）
+
+Sample 1, precision config (seam_step=1, 1893 section), 均为 1 次 warmup
++ 2 次运行的中位数。所有中间 commit 都可以通过 `git log --oneline`
+查到。
+
+| commit | 阶段 | 总耗时 | gap_std | flush_std |
+|---|---|---|---|---|
+| `5bef076` | pre-P0 基线（legacy 混合单位 gap） | **89.3 s** | 1.57 (混合) | 0.87 mm |
+| `c1b110a`→`82a0133` | P0 + P1 双平面 3D + hybrid count_neighbors | 86.1 s | 0.197 | 0.180 |
+| `4f4a11a` | P3 亚像素边缘（P2 测试后回退） | 86.2 s | **0.1915** | 0.1792 |
+| `20fdfed` | P4 RANSAC 鲁棒拟合 | 92.3 s | 0.1921 | **0.1631** |
+| `c994ec8` | P5 per-section 线程并行 | 77.9 s | 0.1922 | 0.1638 |
+| `7f40311` | P6 extract_sections_fast 并行 | 61.3 s | 0.1922 | 0.1635 |
+| `508b0b8` | P7 select_primary_mask_component vectorise | 57.5 s | 0.1920 | 0.1631 |
+| `20c9d4a` | P8 cKDTree.query_pairs 大 N 分支 | 36.3 s | 0.1920 | 0.1644 |
+| `55c171f` | P9 bincount 替换 add.at | **33.0 s** | **0.1920** | **0.1638** |
+
+**累计净收益**：
+- 速度：89.3 s → 33.0 s（**-63%**，快 2.7×）
+- gap_std：**1.57 混合单位 → 0.192 mm**（回到真实毫米、物理意义正确）
+- flush_std：0.87 mm → 0.164 mm（**-81%**）
+- 55 测试全程通过
+- 有效截面 1887/1893（新增的平面品质护栏拒了 6 个脏 section）
+
+被测试后**拒绝**的方案：
+- **P2 refine 早停**：实测 refine 本身开销就小（62 ms），早停节不出
+  可测量时间，精度也无影响 → 回退。
+
+
