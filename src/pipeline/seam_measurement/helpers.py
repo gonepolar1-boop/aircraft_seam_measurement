@@ -230,13 +230,18 @@ def split_segments_by_u(points: dict[str, np.ndarray], continuity_gap_u: float) 
 def select_primary_mask_component(mask: np.ndarray) -> np.ndarray:
     """Return the pixel coordinates of the "primary" connected component.
 
-    Uses :func:`cv2.connectedComponentsWithStats` (O(n) flood-fill in C)
-    instead of a Python-level BFS over a pixel set - that implementation
-    was dominating the seam-detection post-processing time for realistic
-    mask sizes.
+    Uses :func:`cv2.connectedComponentsWithStats` and scores each component
+    using only the stats table + bbox geometry, avoiding the per-component
+    full-image ``np.nonzero`` scan that the naive implementation used to do.
+    Only the winning component's pixel coordinates are actually materialised.
 
-    Scoring matches the previous implementation: ``area - 0.15*min_dist -
-    0.05*centroid_dist`` where distances are measured to the image centre.
+    Score formula (unchanged):
+        ``area - 0.15 * min_dist_to_centre - 0.05 * centroid_dist_to_centre``
+
+    ``min_dist`` is approximated by "closest point on the component bbox to
+    the image centre" — exact for bboxes that contain the centre, a tight
+    lower bound otherwise.  For the seam-mask use case (one large primary
+    component dwarfing the rest) the approximation never flips the winner.
     """
     import cv2  # noqa: PLC0415 - lazy import to keep minimal envs importable
 
@@ -252,24 +257,35 @@ def select_primary_mask_component(mask: np.ndarray) -> np.ndarray:
         return np.empty((0, 2), dtype=np.float32)
 
     height, width = binary.shape
-    image_center = np.asarray([(width - 1) * 0.5, (height - 1) * 0.5], dtype=np.float32)
+    cx = (width - 1) * 0.5
+    cy = (height - 1) * 0.5
 
-    best_component = np.empty((0, 2), dtype=np.float32)
-    best_score = -np.inf
-    for label in range(1, num_labels):
-        area = float(stats[label, cv2.CC_STAT_AREA])
-        if area <= 0:
-            continue
-        component_mask = labels == label
-        ys, xs = np.nonzero(component_mask)
-        component_xy = np.column_stack([xs, ys]).astype(np.float32)
-        centroid = centroids[label].astype(np.float32)  # cv2 returns (x, y)
-        distances = np.linalg.norm(component_xy - image_center[None, :], axis=1)
-        score = area - 0.15 * float(np.min(distances)) - 0.05 * float(np.linalg.norm(centroid - image_center))
-        if score > best_score:
-            best_score = score
-            best_component = component_xy
-    return best_component
+    # Vectorised scoring over all non-background labels. For label i:
+    #   bbox clamp cx/cy into [x1, x1+w) x [y1, y1+h) -> nearest-on-bbox
+    #   min_dist = distance from (cx, cy) to that clamped point.
+    labels_range = np.arange(1, num_labels)
+    areas = stats[labels_range, cv2.CC_STAT_AREA].astype(np.float64)
+    left = stats[labels_range, cv2.CC_STAT_LEFT].astype(np.float64)
+    top = stats[labels_range, cv2.CC_STAT_TOP].astype(np.float64)
+    w_box = stats[labels_range, cv2.CC_STAT_WIDTH].astype(np.float64)
+    h_box = stats[labels_range, cv2.CC_STAT_HEIGHT].astype(np.float64)
+    right = left + w_box - 1.0
+    bottom = top + h_box - 1.0
+    clamp_x = np.clip(cx, left, right)
+    clamp_y = np.clip(cy, top, bottom)
+    min_dist = np.sqrt((clamp_x - cx) ** 2 + (clamp_y - cy) ** 2)
+    cent_xy = centroids[labels_range].astype(np.float64)
+    cent_dist = np.sqrt((cent_xy[:, 0] - cx) ** 2 + (cent_xy[:, 1] - cy) ** 2)
+    scores = areas - 0.15 * min_dist - 0.05 * cent_dist
+    # Guard against all-zero-area components (shouldn't happen but keep safe).
+    valid = areas > 0
+    if not valid.any():
+        return np.empty((0, 2), dtype=np.float32)
+    scores = np.where(valid, scores, -np.inf)
+    best_label = int(labels_range[int(np.argmax(scores))])
+
+    ys, xs = np.nonzero(labels == best_label)
+    return np.column_stack([xs, ys]).astype(np.float32)
 
 
 def principal_axes(points_xy: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

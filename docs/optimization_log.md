@@ -201,3 +201,24 @@ micro-bench 实测 7572 次 searchsorted 只花 13 ms，不是瓶颈。
 
 ---
 
+## P7 — `select_primary_mask_component` 用 cv2 stats 取消 N 次 `np.nonzero`
+
+**改动**：原实现对每个连通分量做一次 `labels == label` + `np.nonzero`，
+全图扫描 1.2M 像素 × 500 个分量 ≈ 大量无用功。改用 stats 表里直接
+得到 area、bbox、centroid；`min_dist_to_center` 用"image_center 在
+bbox 上的最近点"近似（exact 当中心在 bbox 内；对不包含中心的小分量
+是紧下界，选第一名的结果不会翻）。仅对**得分最高**的那一个分量做最后
+一次 `np.nonzero` 实体化像素坐标。
+
+| 项 | P6 | **P7** |
+|---|---|---|
+| 总耗时 | 61.3 s | **57.5 s (-6%)** ✅ |
+| gap_mean / std | 15.328 / 0.1922 | 15.327 / 0.1920 |
+| flush_mean / std | 1.374 / 0.1635 | 1.374 / 0.1631 |
+| 有效截面 | 1887/1893 | 1887/1893 |
+
+**判定：保留**。速度 6% 净提升，精度 bit-essentially-identical。累计
+89.3 s → 57.5 s，**总耗时降 36%**。
+
+---
+
