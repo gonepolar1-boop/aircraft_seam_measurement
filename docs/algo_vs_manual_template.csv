@@ -1,0 +1,4 @@
+sample_id,section_index,algo_gap,manual_gap,algo_flush,manual_flush,notes
+1,0,,,,,示例行：sample_id 与 data/input_data 下的文件夹名对应；section_index 可以留空(按样本聚合)或对齐 section_profile.csv 的 sample_index
+1,100,,,,,
+2,0,,,,,
