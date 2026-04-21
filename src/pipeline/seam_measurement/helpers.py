@@ -4,6 +4,10 @@ from typing import Any
 
 import numpy as np
 
+# ``cv2`` is imported lazily inside the functions that need it so that a
+# minimal test / CI environment (numpy + pytest only) can still import the
+# package for the pure-numpy code paths.
+
 
 def empty_plot_points() -> dict[str, np.ndarray]:
     empty = np.empty((0,), dtype=np.float32)
@@ -59,33 +63,36 @@ def merge_plot_points(*point_sets: dict[str, np.ndarray]) -> dict[str, np.ndarra
 
 
 def difference_plot_points(points: dict[str, np.ndarray], to_remove: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
+    """Return ``points`` with any entry whose pixel coordinate matches one in
+    ``to_remove`` filtered out.
+
+    The previous implementation hashed rounded ``(u, z, px, py)`` tuples -
+    fragile at float32 precision boundaries and a double Python loop.
+    Pixel coordinates are integer-valued (they come from ``np.nonzero`` on
+    a mask), so we use them as a stable identity key, encode ``(px, py)``
+    into a single ``int64`` and membership-test with ``np.isin`` in C.
+    """
     if len(points.get("u", [])) == 0:
         return empty_plot_points()
     if len(to_remove.get("u", [])) == 0:
         return sort_points(points)
 
-    remove_keys = {
-        (
-            round(float(u), 6),
-            round(float(z), 6),
-            round(float(px), 3),
-            round(float(py), 3),
-        )
-        for u, z, (px, py) in zip(to_remove["u"], to_remove["z"], to_remove["pixels_xy"])
-    }
-    keep_mask = np.asarray(
-        [
-            (
-                round(float(u), 6),
-                round(float(z), 6),
-                round(float(px), 3),
-                round(float(py), 3),
-            ) not in remove_keys
-            for u, z, (px, py) in zip(points["u"], points["z"], points["pixels_xy"])
-        ],
-        dtype=bool,
-    )
+    remove_keys = _pack_pixel_keys(to_remove["pixels_xy"])
+    point_keys = _pack_pixel_keys(points["pixels_xy"])
+    keep_mask = ~np.isin(point_keys, remove_keys)
     return sort_points(subset_points(points, keep_mask))
+
+
+def _pack_pixel_keys(pixels_xy: np.ndarray) -> np.ndarray:
+    """Encode (px, py) integer pixel coordinates into a single int64 per row.
+
+    Assumes image dimensions stay under 2**20 (≈ 1 Mpix per side) which is
+    well above the 1236×1032 inputs this project works with.
+    """
+    arr = np.asarray(pixels_xy, dtype=np.float32).reshape(-1, 2)
+    px = np.rint(arr[:, 0]).astype(np.int64)
+    py = np.rint(arr[:, 1]).astype(np.int64)
+    return (py << 20) | (px & 0xFFFFF)
 
 
 def collect_pixels_from_sections(result: dict[str, Any], key: str) -> np.ndarray:
@@ -188,39 +195,44 @@ def split_segments_by_u(points: dict[str, np.ndarray], continuity_gap_u: float) 
 
 
 def select_primary_mask_component(mask: np.ndarray) -> np.ndarray:
-    ys, xs = np.nonzero(mask)
-    if len(xs) == 0:
+    """Return the pixel coordinates of the "primary" connected component.
+
+    Uses :func:`cv2.connectedComponentsWithStats` (O(n) flood-fill in C)
+    instead of a Python-level BFS over a pixel set - that implementation
+    was dominating the seam-detection post-processing time for realistic
+    mask sizes.
+
+    Scoring matches the previous implementation: ``area - 0.15*min_dist -
+    0.05*centroid_dist`` where distances are measured to the image centre.
+    """
+    import cv2  # noqa: PLC0415 - lazy import to keep minimal envs importable
+
+    mask = np.asarray(mask)
+    if mask.size == 0:
+        return np.empty((0, 2), dtype=np.float32)
+    binary = (mask > 0).astype(np.uint8)
+    if not binary.any():
         return np.empty((0, 2), dtype=np.float32)
 
-    coords = np.column_stack([xs, ys]).astype(np.int32)
-    coord_set = {tuple(point) for point in coords.tolist()}
-    visited: set[tuple[int, int]] = set()
-    image_center = np.asarray([(mask.shape[1] - 1) * 0.5, (mask.shape[0] - 1) * 0.5], dtype=np.float32)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity=8)
+    if num_labels <= 1:  # only the background label was returned
+        return np.empty((0, 2), dtype=np.float32)
+
+    height, width = binary.shape
+    image_center = np.asarray([(width - 1) * 0.5, (height - 1) * 0.5], dtype=np.float32)
 
     best_component = np.empty((0, 2), dtype=np.float32)
     best_score = -np.inf
-    for point in coord_set:
-        if point in visited:
+    for label in range(1, num_labels):
+        area = float(stats[label, cv2.CC_STAT_AREA])
+        if area <= 0:
             continue
-        stack = [point]
-        visited.add(point)
-        component: list[tuple[int, int]] = []
-        while stack:
-            x, y = stack.pop()
-            component.append((x, y))
-            for dy in (-1, 0, 1):
-                for dx in (-1, 0, 1):
-                    if dx == 0 and dy == 0:
-                        continue
-                    neighbor = (x + dx, y + dy)
-                    if neighbor in coord_set and neighbor not in visited:
-                        visited.add(neighbor)
-                        stack.append(neighbor)
-
-        component_xy = np.asarray(component, dtype=np.float32)
-        centroid = np.mean(component_xy, axis=0)
+        component_mask = labels == label
+        ys, xs = np.nonzero(component_mask)
+        component_xy = np.column_stack([xs, ys]).astype(np.float32)
+        centroid = centroids[label].astype(np.float32)  # cv2 returns (x, y)
         distances = np.linalg.norm(component_xy - image_center[None, :], axis=1)
-        score = float(len(component_xy)) - 0.15 * float(np.min(distances)) - 0.05 * float(np.linalg.norm(centroid - image_center))
+        score = area - 0.15 * float(np.min(distances)) - 0.05 * float(np.linalg.norm(centroid - image_center))
         if score > best_score:
             best_score = score
             best_component = component_xy

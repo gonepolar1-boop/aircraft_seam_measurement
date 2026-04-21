@@ -38,14 +38,16 @@ def build_depth_image_from_point_map(point_map: np.ndarray) -> tuple[np.ndarray,
 
 def _load_model(checkpoint_path: str | Path, device: torch.device) -> torch.nn.Module:
     resolved_checkpoint = str(Path(checkpoint_path).resolve())
-    checkpoint = torch.load(resolved_checkpoint, map_location=device, weights_only=True)
-    model_name = str(checkpoint.get("model_name", REAL_ONLY_DEFAULTS["model_name"]))
-    base_channels = int(checkpoint.get("model_base_channels", REAL_ONLY_DEFAULTS["model_base_channels"]))
-    cache_key = (resolved_checkpoint, str(device), model_name)
+    # Probe the cache BEFORE calling torch.load; otherwise every pipeline run
+    # re-deserialises the full .pth from disk even on a cache hit.
+    cache_key = (resolved_checkpoint, str(device))
     cached = _MODEL_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
+    checkpoint = torch.load(resolved_checkpoint, map_location=device, weights_only=True)
+    model_name = str(checkpoint.get("model_name", REAL_ONLY_DEFAULTS["model_name"]))
+    base_channels = int(checkpoint.get("model_base_channels", REAL_ONLY_DEFAULTS["model_base_channels"]))
     model = build_model(model_name=model_name, base_channels=base_channels).to(device)
     state_dict = checkpoint.get("model_state_dict", checkpoint)
     model.load_state_dict(state_dict)

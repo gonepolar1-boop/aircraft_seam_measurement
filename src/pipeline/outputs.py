@@ -166,7 +166,10 @@ def save_metric_profile_plot(
             ax.scatter(x_values[valid_mask], metric_values[valid_mask], color=color, s=24, alpha=0.95, label="valid")
         invalid_x = x_values[~valid_mask]
         if len(invalid_x):
-            invalid_y = np.full((len(invalid_x),), mean_value if np.isfinite(mean_value) else 0.0, dtype=np.float32)
+            # Use NaN (matplotlib drops them) rather than 0.0 - plotting a
+            # row of zeros along the x axis misleads the reader into thinking
+            # zero was measured at those sections.
+            invalid_y = np.full((len(invalid_x),), mean_value if np.isfinite(mean_value) else np.nan, dtype=np.float32)
             ax.scatter(invalid_x, invalid_y, color="#94a3b8", marker="x", s=24, alpha=0.85, label="invalid")
         if np.isfinite(mean_value):
             ax.axhline(mean_value, color="#475569", linestyle="--", linewidth=1.2, alpha=0.9, label=f"mean={mean_value:.4f}")
