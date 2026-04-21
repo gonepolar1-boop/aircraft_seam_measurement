@@ -199,19 +199,87 @@ def _select_edge_point(points: dict[str, np.ndarray], side: str) -> dict[str, np
 
 
 def _build_edge_point_from_model(points: dict[str, np.ndarray], fit: dict[str, float], side: str) -> dict[str, np.ndarray]:
+    """Return the edge point at ``edge_u = max/min(u)`` with sub-pixel (x, y)
+    and sub-pixel pixel_xy interpolated from the segment's linear trend
+    rather than snapped to the nearest existing pixel.
+
+    Previously this took the pixel-nearest point to ``edge_u`` and
+    overwrote just its z with the fitted value. That left (x, y) and
+    the raw pixel coordinates integer-aligned, creating a ~1 px
+    discretisation wobble that showed up as a small along-seam
+    component in the 3-way gap/flush decomposition. Linearly fitting
+    each coordinate against u gives a fractional interpolation whose
+    residual is well below the scanner's per-pixel noise.
+    """
     if len(points.get("u", [])) == 0:
         return empty_plot_points()
     u_values = np.asarray(points["u"], dtype=np.float32).reshape(-1)
+    pixels_xy = np.asarray(points.get("pixels_xy", np.empty((0, 2))), dtype=np.float32).reshape(-1, 2)
+    xyz = np.asarray(points.get("xyz", np.empty((0, 3))), dtype=np.float32).reshape(-1, 3)
     edge_u = float(np.max(u_values)) if side == "left" else float(np.min(u_values))
-    fit_z = _evaluate_top_surface_fit(np.asarray([edge_u], dtype=np.float32), fit, np.nan)
+    fit_z_arr = _evaluate_top_surface_fit(np.asarray([edge_u], dtype=np.float32), fit, np.nan)
+    fit_z_value = float(fit_z_arr[0])
+
+    if len(u_values) < 2:
+        nearest_index = int(np.argmin(np.abs(u_values - edge_u)))
+        edge_point = {key: value[nearest_index : nearest_index + 1].copy() for key, value in points.items()}
+        edge_point["u"][0] = edge_u
+        if np.isfinite(fit_z_value):
+            edge_point["z"][0] = fit_z_value
+            if edge_point["xyz"].shape[1] >= 3:
+                edge_point["xyz"][0, 2] = fit_z_value
+        return edge_point
+
+    # Linear least-squares fit of each spatial coordinate as a function
+    # of u. polyfit is robust enough for the small (N = 10-30) point
+    # sets that segments carry.
+    u64 = u_values.astype(np.float64)
+
+    def _linear_eval(values_1d: np.ndarray) -> float:
+        v64 = np.asarray(values_1d, dtype=np.float64).reshape(-1)
+        if len(v64) != len(u64):
+            return float(values_1d[int(np.argmin(np.abs(u_values - edge_u)))])
+        slope, intercept = np.polyfit(u64, v64, deg=1)
+        if not np.isfinite(slope) or not np.isfinite(intercept):
+            return float(values_1d[int(np.argmin(np.abs(u_values - edge_u)))])
+        return float(slope * edge_u + intercept)
+
+    edge_px = _linear_eval(pixels_xy[:, 0]) if pixels_xy.shape[0] == len(u_values) else float("nan")
+    edge_py = _linear_eval(pixels_xy[:, 1]) if pixels_xy.shape[0] == len(u_values) else float("nan")
+    edge_x = _linear_eval(xyz[:, 0]) if xyz.shape[0] == len(u_values) else float("nan")
+    edge_y = _linear_eval(xyz[:, 1]) if xyz.shape[0] == len(u_values) else float("nan")
+    # z comes from the side's fitted (u,z) line.  Fall back to the xyz z
+    # trend only if the fitted line is invalid.
+    if np.isfinite(fit_z_value):
+        edge_z = fit_z_value
+    else:
+        edge_z = _linear_eval(xyz[:, 2]) if xyz.shape[0] == len(u_values) else float("nan")
+
     nearest_index = int(np.argmin(np.abs(u_values - edge_u)))
-    edge_point = {key: value[nearest_index : nearest_index + 1].copy() for key, value in points.items()}
-    edge_point["u"][0] = edge_u
-    if np.isfinite(fit_z[0]):
-        edge_point["z"][0] = float(fit_z[0])
-        if edge_point["xyz"].shape[1] >= 3:
-            edge_point["xyz"][0, 2] = float(fit_z[0])
-    return edge_point
+    fallback_pixel = pixels_xy[nearest_index] if pixels_xy.shape[0] else np.asarray([np.nan, np.nan], dtype=np.float32)
+    fallback_xyz = xyz[nearest_index] if xyz.shape[0] else np.asarray([np.nan, np.nan, np.nan], dtype=np.float32)
+
+    pixels_out = np.asarray(
+        [
+            edge_px if np.isfinite(edge_px) else float(fallback_pixel[0]),
+            edge_py if np.isfinite(edge_py) else float(fallback_pixel[1]),
+        ],
+        dtype=np.float32,
+    ).reshape(1, 2)
+    xyz_out = np.asarray(
+        [
+            edge_x if np.isfinite(edge_x) else float(fallback_xyz[0]),
+            edge_y if np.isfinite(edge_y) else float(fallback_xyz[1]),
+            edge_z if np.isfinite(edge_z) else float(fallback_xyz[2]),
+        ],
+        dtype=np.float32,
+    ).reshape(1, 3)
+    return {
+        "u": np.asarray([edge_u], dtype=np.float32),
+        "z": np.asarray([xyz_out[0, 2]], dtype=np.float32),
+        "pixels_xy": pixels_out,
+        "xyz": xyz_out,
+    }
 
 
 def _refine_side_edges(
