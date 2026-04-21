@@ -346,6 +346,12 @@ def _scatter_points(ax: Any, points: dict[str, Any], color: str, alpha: float, l
 
 
 def _collect_anomaly_sample_indices(section_results: list[dict[str, Any]], section_profile: list[dict[str, Any]]) -> list[int]:
+    # Read the outlier threshold from the gap/flush YAML config. Falling
+    # back to GapFlushParams' default keeps this callable even if outputs
+    # is imported before params has been configured explicitly.
+    from .seam_measurement.params import GapFlushParams  # noqa: PLC0415
+    sigma = float(GapFlushParams().outlier_sigma)
+
     anomaly = []
     gap_values = np.asarray([float(item.get("gap", np.nan)) for item in section_profile if bool(item.get("valid", False)) and np.isfinite(item.get("gap", np.nan))], dtype=np.float32)
     flush_values = np.asarray([float(item.get("flush", np.nan)) for item in section_profile if bool(item.get("valid", False)) and np.isfinite(item.get("flush", np.nan))], dtype=np.float32)
@@ -361,8 +367,8 @@ def _collect_anomaly_sample_indices(section_results: list[dict[str, Any]], secti
             continue
         gap = float(item.get("gap", np.nan))
         flush = float(item.get("flush", np.nan))
-        gap_outlier = np.isfinite(gap_std) and gap_std > 1e-6 and np.isfinite(gap) and abs(gap - gap_mean) > 2.0 * gap_std
-        flush_outlier = np.isfinite(flush_std) and flush_std > 1e-6 and np.isfinite(flush) and abs(flush - flush_mean) > 2.0 * flush_std
+        gap_outlier = np.isfinite(gap_std) and gap_std > 1e-6 and np.isfinite(gap) and abs(gap - gap_mean) > sigma * gap_std
+        flush_outlier = np.isfinite(flush_std) and flush_std > 1e-6 and np.isfinite(flush) and abs(flush - flush_mean) > sigma * flush_std
         if gap_outlier or flush_outlier:
             anomaly.append(sample_index)
 

@@ -14,9 +14,10 @@ from .helpers import (
     subset_points,
 )
 from .params import GapFlushParams
+from .types import LineFit, PlotPoints, TopSurfacePayload
 
 
-def detect_top_surface_edges(section: dict[str, Any], params: GapFlushParams) -> dict[str, Any]:
+def detect_top_surface_edges(section: dict[str, Any], params: GapFlushParams) -> TopSurfacePayload:
     background = _finite_background_points(section)
     if len(background["u"]) == 0:
         return _empty_top_surface_payload("no_background_points")
@@ -132,7 +133,7 @@ def _estimate_top_z(points: dict[str, np.ndarray], quantile: float) -> float:
     return float(np.quantile(finite_z, quantile))
 
 
-def _fit_top_surface_line(points: dict[str, np.ndarray], z_ref: float, params: GapFlushParams) -> dict[str, float]:
+def _fit_top_surface_line(points: dict[str, np.ndarray], z_ref: float, params: GapFlushParams) -> LineFit:
     if len(points.get("u", [])) < int(params.top_surface_fit_min_points) or not np.isfinite(z_ref):
         return {"slope": 0.0, "intercept": float(z_ref), "valid": False}
     u = np.asarray(points["u"], dtype=np.float32).reshape(-1)
@@ -150,7 +151,7 @@ def _fit_top_surface_line(points: dict[str, np.ndarray], z_ref: float, params: G
     return {"slope": float(slope), "intercept": float(intercept), "valid": True}
 
 
-def _fit_segment_surface_line(segment: dict[str, np.ndarray], fallback_fit: dict[str, float], z_ref: float) -> dict[str, float]:
+def _fit_segment_surface_line(segment: dict[str, np.ndarray], fallback_fit: LineFit, z_ref: float) -> LineFit:
     if len(segment.get("u", [])) < 2:
         return dict(fallback_fit)
     u = np.asarray(segment["u"], dtype=np.float32).reshape(-1)
@@ -278,16 +279,30 @@ def _refine_side_edges(
 
 
 def _rolling_median(values: np.ndarray, window: int) -> np.ndarray:
+    """NaN-aware centred rolling median.
+
+    The previous implementation was a Python-level for-loop slicing the
+    array at every position. This vectorises it via
+    :func:`numpy.lib.stride_tricks.sliding_window_view` + :func:`np.nanmedian`,
+    moving the entire hot loop into C. NaN handling (treat missing points
+    as absent, not as values) is preserved.
+    """
+    import warnings  # noqa: PLC0415
+
     values = np.asarray(values, dtype=np.float32).reshape(-1)
     if len(values) == 0:
         return values
     radius = max(1, int(window) // 2)
-    output = np.full_like(values, np.nan)
-    for index in range(len(values)):
-        chunk = values[max(0, index - radius) : min(len(values), index + radius + 1)]
-        finite_chunk = chunk[np.isfinite(chunk)]
-        if len(finite_chunk):
-            output[index] = float(np.median(finite_chunk))
+    win_size = 2 * radius + 1
+    # Pad with NaN on both sides so the sliding window covers the edges
+    # without reflecting data.
+    padded = np.pad(values, radius, mode="constant", constant_values=np.nan)
+    windows = np.lib.stride_tricks.sliding_window_view(padded, win_size)
+    with warnings.catch_warnings():
+        # All-NaN rows legitimately occur (leading/trailing padding) - keep
+        # the NaN result without polluting the console.
+        warnings.filterwarnings("ignore", message="All-NaN slice encountered", category=RuntimeWarning)
+        output = np.nanmedian(windows, axis=1).astype(np.float32)
     return output
 
 

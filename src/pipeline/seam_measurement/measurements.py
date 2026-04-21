@@ -6,9 +6,10 @@ import numpy as np
 
 from .geometry import build_section_reference_frame, measure_gap_in_reference_frame, measure_point_line_gap_flush
 from .helpers import empty_plot_points
+from .types import SectionMeasurement
 
 
-def compute_section_gap_flush(section_result: dict[str, Any]) -> dict[str, Any]:
+def compute_section_gap_flush(section_result: dict[str, Any]) -> SectionMeasurement:
     top_surface = section_result.get("top_surface", {})
     left_edge = top_surface.get("left_edge", empty_plot_points())
     right_edge = top_surface.get("right_edge", empty_plot_points())

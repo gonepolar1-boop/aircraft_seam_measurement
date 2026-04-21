@@ -66,6 +66,7 @@ _BUILTIN_DEFAULTS: dict[str, float | int] = {
     "top_surface_outlier_u_min": 12.0,
     "top_surface_refine_passes": 3,
     "top_surface_fit_min_points": 12,
+    "outlier_sigma": 2.0,
 }
 
 
@@ -157,3 +158,4 @@ class GapFlushParams:
     top_surface_outlier_u_min: float = float(_CFG["top_surface_outlier_u_min"])
     top_surface_refine_passes: int = int(_CFG["top_surface_refine_passes"])
     top_surface_fit_min_points: int = int(_CFG["top_surface_fit_min_points"])
+    outlier_sigma: float = float(_CFG["outlier_sigma"])

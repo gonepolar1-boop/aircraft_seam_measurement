@@ -99,6 +99,17 @@ top_surface_refine_passes: 3
 top_surface_fit_min_points: 12
 
 # ---------------------------------------------------------------------------
+# Anomaly / plotting diagnostics (outputs.py)
+# ---------------------------------------------------------------------------
+
+# Number of standard deviations a section's gap or flush may deviate from
+# the mean before it is flagged as an outlier (used to pick anomaly
+# highlights on the depth overlay and per-section debug plots). Two
+# previously-duplicated 2.0 literals in outputs.py are now read from here.
+# unit: sigma multiple, typical: 1.5-3.0
+outlier_sigma: 2.0
+
+# ---------------------------------------------------------------------------
 # Legacy parameters
 #
 # Declared on the GapFlushParams dataclass for backwards-compatibility but
