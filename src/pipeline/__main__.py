@@ -43,8 +43,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--seam-step",
         type=int,
-        default=4,
-        help="Section sampling step size in pixels.",
+        default=None,
+        help="Section sampling step size in pixels. If omitted, uses the "
+             "value from configs/gap_flush.yaml (GapFlushParams.seam_step).",
     )
     parser.add_argument(
         "--show-3d-viewer",
@@ -61,12 +62,15 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    # If --seam-step was not supplied, fall through to GapFlushParams'
+    # yaml-sourced default instead of clobbering it with a hardcoded 4.
+    params = GapFlushParams() if args.seam_step is None else GapFlushParams(seam_step=int(args.seam_step))
     result = run_gap_flush_pipeline(
         pcd_path=args.pcd_path,
         checkpoint_path=args.checkpoint_path,
         threshold=float(args.threshold),
         output_root=args.output_root,
-        params=GapFlushParams(seam_step=int(args.seam_step)),
+        params=params,
         fast_mode=args.fast_mode,
         save_profile_plots=not args.no_profile_plots,
         save_viewer_bundle=args.save_3d_viewer_bundle or args.show_3d_viewer,

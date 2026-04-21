@@ -16,18 +16,23 @@
 
 # Pixel step between consecutive section samples along the seam tangent.
 # Smaller = more sections, denser profile, more compute.  unit: px, typical: 1-16
-seam_step: 4
+# Precision-tuned: 1 (was 4) - densest along-seam resolution.
+seam_step: 1
 
 # Half-length (along tangent) of the slab that defines one section in pixels.
 # Controls how many points the section aggregates for its profile.  unit: px, typical: 2-10
-section_half_length_px: 4.0
+# Precision-tuned: 5.0 (was 4.0) - slightly wider slab gives more points to
+# fit against, at the cost of mild blurring of very fine features.
+section_half_length_px: 5.0
 
 # ---------------------------------------------------------------------------
 # Section-level filtering (bottom.py::_filter_isolated_points)
 # ---------------------------------------------------------------------------
 
 # Minimum kept points required for a section to be considered measurable.  unit: count, typical: 10-50
-min_section_points: 24
+# Precision-tuned: 32 (was 24) - stricter acceptance rejects sections whose
+# filtered point count is too low to fit a reliable surface.
+min_section_points: 32
 
 # u-direction radius used when counting a point's neighbours for the
 # isolated-point filter.  unit: px, typical: 1-5
@@ -47,11 +52,15 @@ min_neighbors: 2
 
 # Quantile used to estimate the "top" z of each side (robust to outliers
 # vs using the plain max).  unit: probability in [0, 1], typical: 0.7-0.95
-top_surface_quantile: 0.85
+# Precision-tuned: 0.90 (was 0.85) - higher quantile tracks the true top
+# surface more closely while staying safely below the pure max.
+top_surface_quantile: 0.90
 
 # Thickness (mm) of the band around the top-surface fit that a point may
 # sit in and still be kept as a top-surface candidate.  unit: mm, typical: 0.5-2
-top_surface_band_height: 1.0
+# Precision-tuned: 0.8 (was 1.0) - tighter band catches fewer off-surface
+# points around the seam shoulder.
+top_surface_band_height: 0.8
 
 # Fraction of the local seam-mask width that is excluded on each side of
 # centre when picking top-surface neighbour points (avoids sampling points
@@ -73,7 +82,8 @@ top_surface_min_neighbors: 2
 top_surface_continuity_gap_u: 2.5
 
 # Minimum number of points a top-surface segment must contain to be kept.  unit: count, typical: 3-15
-top_surface_min_segment_points: 6
+# Precision-tuned: 10 (was 6) - rejects short unreliable segments.
+top_surface_min_segment_points: 10
 
 # Search radius for the top-surface neighbourhood, expressed as a multiple
 # of the local seam-mask width (min 8 px).  unit: ratio * px, typical: 2-5
@@ -81,22 +91,31 @@ top_surface_search_radius_ratio: 3.0
 
 # Window size of the rolling median used to smooth the per-section top-edge
 # u position during refinement.  unit: count of sections (odd recommended), typical: 3-11
-top_surface_smooth_window: 5
+# Precision-tuned: 9 (was 5) - wider window produces smoother edge-position
+# reference and rejects more per-section jitter.
+top_surface_smooth_window: 9
 
 # u-outlier threshold as a fraction of the local seam-mask width. If the
 # refined edge deviates from the median by more than this ratio * width,
 # the edge is re-selected.  unit: ratio, typical: 0.3-0.8
-top_surface_outlier_u_ratio: 0.5
+# Precision-tuned: 0.35 (was 0.5) - stricter outlier detection triggers
+# more re-selections.
+top_surface_outlier_u_ratio: 0.35
 
 # Absolute floor (px) for the u-outlier threshold, so very narrow masks do
 # not make it overly tight.  unit: px, typical: 6-20
-top_surface_outlier_u_min: 12.0
+# Precision-tuned: 8.0 (was 12.0) - tighter absolute floor.
+top_surface_outlier_u_min: 8.0
 
 # Number of refinement passes over the per-section top edges.  unit: count, typical: 1-5
-top_surface_refine_passes: 3
+# Precision-tuned: 5 (was 3) - more iterations let the smoothed edge
+# sequence converge further.
+top_surface_refine_passes: 5
 
 # Minimum points required to fit the top-surface line (np.polyfit).  unit: count, typical: 6-20
-top_surface_fit_min_points: 12
+# Precision-tuned: 16 (was 12) - more points make slope / intercept less
+# sensitive to individual outliers.
+top_surface_fit_min_points: 16
 
 # ---------------------------------------------------------------------------
 # Anomaly / plotting diagnostics (outputs.py)

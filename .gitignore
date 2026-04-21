@@ -1,4 +1,5 @@
 .vscode/
+.claude/
 
 # Python cache and virtual environments
 __pycache__/
