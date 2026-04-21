@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import os
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import numpy as np
 
 from .helpers import principal_axes, select_primary_mask_component, snap_center_to_valid_pixel, validate_inputs
 from .params import GapFlushParams
+
+_SECTION_EXTRACT_THREADS = int(os.environ.get("GAP_FLUSH_MAX_WORKERS", "0"))
+if _SECTION_EXTRACT_THREADS <= 0:
+    _SECTION_EXTRACT_THREADS = min(8, max(2, (os.cpu_count() or 1)))
 
 
 def extract_seam_direction(mask: np.ndarray) -> dict[str, np.ndarray]:
@@ -94,24 +100,38 @@ def extract_sections_fast(
 
     half_length = float(ctx["params"].section_half_length_px)
     boundary_eps = 1e-5
-    sections: list[dict[str, Any]] = []
-    for sample_index, sample_t in enumerate(ctx["sample_positions"]):
+    selector = _searchsorted_selector(boundary_eps)
+    sample_positions = ctx["sample_positions"]
+
+    def _build_one(sample_index: int) -> dict[str, Any] | None:
+        sample_t = float(sample_positions[sample_index])
         slab_start = int(np.searchsorted(ctx["sorted_component_t"], sample_t - half_length - boundary_eps, side="left"))
         slab_end = int(np.searchsorted(ctx["sorted_component_t"], sample_t + half_length + boundary_eps, side="right"))
         if slab_end <= slab_start:
-            continue
+            return None
         seam_pixels_xy = ctx["sorted_mask_pixels"][slab_start:slab_end]
         slab_component_n = ctx["sorted_component_n"][slab_start:slab_end]
-        section_payload = _build_section_from_slab(
+        return _build_section_from_slab(
             ctx=ctx,
             sample_index=sample_index,
             seam_pixels_xy=seam_pixels_xy.astype(np.float32),
             slab_component_n=slab_component_n,
-            background_selector=_searchsorted_selector(boundary_eps),
+            background_selector=selector,
         )
-        if section_payload is not None:
-            sections.append(section_payload)
-    return sections
+
+    # ctx arrays are read-only after _prepare_section_context + the pre-sorts
+    # above, so threads can all index into them safely.  selector is pure-
+    # functional (returns a dict built from numpy slices).
+    payloads: list[dict[str, Any] | None] = [None] * len(sample_positions)
+    if _SECTION_EXTRACT_THREADS > 1 and len(sample_positions) > 0:
+        with ThreadPoolExecutor(max_workers=_SECTION_EXTRACT_THREADS) as pool:
+            futures = {pool.submit(_build_one, i): i for i in range(len(sample_positions))}
+            for future, i in futures.items():
+                payloads[i] = future.result()
+    else:
+        for i in range(len(sample_positions)):
+            payloads[i] = _build_one(i)
+    return [p for p in payloads if p is not None]
 
 
 # ---------------------------------------------------------------------------
