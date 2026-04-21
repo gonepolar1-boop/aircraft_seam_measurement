@@ -9,6 +9,7 @@ from .seam_mapping.inference import predict_mask_from_point_map, preload_model
 from .seam_mapping.io import load_point_map
 from .seam_measurement import GapFlushParams, compute_gap_flush_from_mapping
 from .seam_training.utils import REAL_ONLY_DEFAULTS
+from .timing import StageTimer
 from .viewer3d import show_gap_flush_open3d_viewer
 
 
@@ -28,6 +29,7 @@ def run_gap_flush_pipeline(
     resolved_pcd_path = Path(pcd_path).resolve()
     resolved_checkpoint_path = Path(checkpoint_path).resolve()
     output_dir = _build_output_dir(resolved_pcd_path, output_root)
+    timer = StageTimer()
 
     measurement_result, counts = _run_measurement(
         pcd_path=resolved_pcd_path,
@@ -35,9 +37,11 @@ def run_gap_flush_pipeline(
         threshold=float(threshold),
         params=params,
         fast_mode=fast_mode,
+        timer=timer,
     )
-    section_profile = _build_section_profile(measurement_result["section_results"], measurement_result.get("sections", []))
-    summary = _build_summary(measurement_result["summary"], section_profile)
+    with timer.stage("build_profile"):
+        section_profile = _build_section_profile(measurement_result["section_results"], measurement_result.get("sections", []))
+        summary = _build_summary(measurement_result["summary"], section_profile)
     result = {
         "inputs": {
             "pcd_path": str(resolved_pcd_path),
@@ -51,13 +55,15 @@ def run_gap_flush_pipeline(
         "counts": counts,
         "params": _params_payload(params),
     }
-    result["exports"] = save_pipeline_outputs(
-        output_dir=output_dir,
-        result=result,
-        measurement_result=measurement_result,
-        save_profile_plots=save_profile_plots,
-        save_viewer_bundle=save_viewer_bundle,
-    )
+    with timer.stage("save_outputs"):
+        result["exports"] = save_pipeline_outputs(
+            output_dir=output_dir,
+            result=result,
+            measurement_result=measurement_result,
+            save_profile_plots=save_profile_plots,
+            save_viewer_bundle=save_viewer_bundle,
+        )
+    result["timing"] = timer.summary()
     if show_3d_viewer:
         show_gap_flush_open3d_viewer(
             measurement_result=measurement_result,
@@ -89,27 +95,32 @@ def _run_measurement(
     threshold: float,
     params: GapFlushParams,
     fast_mode: bool,
+    timer: StageTimer | None = None,
 ) -> tuple[dict[str, Any], dict[str, int]]:
-    point_map = load_point_map(pcd_path)
-    prediction = predict_mask_from_point_map(
-        point_map=point_map,
-        checkpoint_path=checkpoint_path,
-        threshold=threshold,
-    )
+    timer = StageTimer() if timer is None else timer
+    with timer.stage("load_point_map"):
+        point_map = load_point_map(pcd_path)
+    with timer.stage("predict_mask"):
+        prediction = predict_mask_from_point_map(
+            point_map=point_map,
+            checkpoint_path=checkpoint_path,
+            threshold=threshold,
+        )
     pred_mask = np.asarray(prediction["pred_mask"], dtype=np.uint8)
-    measurement_result = compute_gap_flush_from_mapping(
-        {
-            "inputs": {
-                "pcd_path": str(pcd_path),
-                "checkpoint_path": str(checkpoint_path),
-                "threshold": float(threshold),
+    with timer.stage("compute_gap_flush"):
+        measurement_result = compute_gap_flush_from_mapping(
+            {
+                "inputs": {
+                    "pcd_path": str(pcd_path),
+                    "checkpoint_path": str(checkpoint_path),
+                    "threshold": float(threshold),
+                },
+                "point_map": point_map,
+                "pred_mask": pred_mask,
             },
-            "point_map": point_map,
-            "pred_mask": pred_mask,
-        },
-        params=params,
-        fast_mode=fast_mode,
-    )
+            params=params,
+            fast_mode=fast_mode,
+        )
     return measurement_result, _build_counts(point_map=point_map, pred_mask=pred_mask)
 
 

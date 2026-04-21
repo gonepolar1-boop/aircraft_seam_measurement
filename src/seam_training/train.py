@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 
 import numpy as np
@@ -12,6 +13,16 @@ from .preview import save_epoch_previews
 from .utils import REAL_ONLY_DEFAULTS, build_artifact_paths, build_cfg, reset_training_artifacts, set_seed, setup_logging
 
 METRIC_KEYS = ("train_losses",)
+# Schema shared with scripts/train/run_loocv_experiments.py so downstream
+# plotting tools can consume either source uniformly.
+HISTORY_JSON_KEYS = (
+    "train_losses",
+    "val_losses",
+    "val_dice",
+    "val_iou",
+    "val_precision",
+    "val_recall",
+)
 
 
 def save_checkpoint(model, optimizer, epoch, save_path, cfg):
@@ -47,10 +58,32 @@ def save_history(history, paths, train_loss):
     history["train_losses"].append(train_loss)
     for key in METRIC_KEYS:
         np.save(paths[key], np.array(history[key]))
+    # Also emit a history.json side-car with the same schema as the LOOCV
+    # script. Keeps a single source-of-truth for the plotting tools
+    # regardless of whether you ran the single-sample trainer or LOOCV.
+    history_path = paths["metrics_dir"] / "history.json"
+    serialisable = {key: [float(value) for value in history.get(key, [])] for key in HISTORY_JSON_KEYS}
+    with history_path.open("w", encoding="utf-8") as fh:
+        json.dump(serialisable, fh, ensure_ascii=False, indent=2)
 
 
 def load_history(paths):
-    return {key: np.load(paths[key]).tolist() if paths[key].exists() else [] for key in METRIC_KEYS}
+    legacy = {key: np.load(paths[key]).tolist() if paths[key].exists() else [] for key in METRIC_KEYS}
+    # Prefer the JSON side-car if present - carries the full metric list.
+    history_path = paths["metrics_dir"] / "history.json"
+    history = {key: [] for key in HISTORY_JSON_KEYS}
+    if history_path.exists():
+        try:
+            with history_path.open("r", encoding="utf-8") as fh:
+                loaded = json.load(fh)
+            for key in HISTORY_JSON_KEYS:
+                history[key] = [float(value) for value in loaded.get(key, [])]
+        except (OSError, json.JSONDecodeError):
+            history = {key: [] for key in HISTORY_JSON_KEYS}
+    # Merge legacy train_losses if the json was empty but the npy wasn't.
+    if not history["train_losses"] and legacy.get("train_losses"):
+        history["train_losses"] = legacy["train_losses"]
+    return history
 
 
 def train_model(cfg):
