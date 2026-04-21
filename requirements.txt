@@ -2,6 +2,7 @@
 # Versions are lower bounds known to work; adjust as needed for your platform.
 
 numpy>=1.24
+scipy>=1.10
 opencv-python>=4.8
 matplotlib>=3.7
 tqdm>=4.65
