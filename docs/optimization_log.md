@@ -142,3 +142,26 @@ section ≈ 4-5 s），不是 loop 开销。
 
 ---
 
+## P5 — per-section 线程并行
+
+**改动**：`core.py::compute_gap_flush` 里两个 per-section 循环
+（bottom + top_surface 初始、以及 measurement）各换成
+`ThreadPoolExecutor` 提交，workers 默认 `min(8, cpu_count())`，可由
+`GAP_FLUSH_MAX_WORKERS` 环境变量覆盖。numpy 底层计算释放 GIL，这类
+数组 heavy 的 Python 层线程化实测有显著收益。
+
+| 项 | P4 | **P5** |
+|---|---|---|
+| 总耗时 | 92.3 s | **77.9 s (-16%)** ✅ |
+| gap_std | 0.1921 | 0.1922 (噪声) |
+| flush_std | 0.1631 | 0.1638 (+0.0007) |
+| 有效截面 | 1887/1893 | 1887/1893 |
+| CPU 核数 | — | 20 可用，取 8 个 worker |
+
+flush_std 的 0.0007 mm 抖动来自 RANSAC 的模块级 RNG 在多线程下被不同
+顺序消耗。数值上属于噪声级（< 0.5%）。
+
+**判定：保留**。速度 16% 净提升，精度 bit-essentially-equivalent。
+
+---
+
