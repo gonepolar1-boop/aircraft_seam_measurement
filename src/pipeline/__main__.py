@@ -31,16 +31,6 @@ def parse_args() -> argparse.Namespace:
         help="Optional output root. Defaults to outputs/pipeline.",
     )
     parser.add_argument(
-        "--no-profile-plots",
-        action="store_true",
-        help="Skip gap/flush PNG profile generation for faster online runs.",
-    )
-    parser.add_argument(
-        "--fast-mode",
-        action="store_true",
-        help="Use the faster section-extraction path for online runs. Default keeps the original result path.",
-    )
-    parser.add_argument(
         "--seam-step",
         type=int,
         default=None,
@@ -65,14 +55,19 @@ def main() -> None:
     # If --seam-step was not supplied, fall through to GapFlushParams'
     # yaml-sourced default instead of clobbering it with a hardcoded 4.
     params = GapFlushParams() if args.seam_step is None else GapFlushParams(seam_step=int(args.seam_step))
+    # The CLI surface runs in precision mode only: the reference
+    # extraction path (``fast_mode=False``) and full profile plot
+    # generation are always used.  Bench / internal users can still
+    # pass ``fast_mode=True`` / ``save_profile_plots=False`` through
+    # the Python API, but no command-line switch exposes them here.
     result = run_gap_flush_pipeline(
         pcd_path=args.pcd_path,
         checkpoint_path=args.checkpoint_path,
         threshold=float(args.threshold),
         output_root=args.output_root,
         params=params,
-        fast_mode=args.fast_mode,
-        save_profile_plots=not args.no_profile_plots,
+        fast_mode=False,
+        save_profile_plots=True,
         save_viewer_bundle=args.save_3d_viewer_bundle or args.show_3d_viewer,
         show_3d_viewer=args.show_3d_viewer,
     )

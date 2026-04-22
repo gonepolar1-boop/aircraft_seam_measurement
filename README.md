@@ -61,11 +61,15 @@ Commonly useful flags:
 | Flag | Purpose |
 | --- | --- |
 | `--threshold`               | Segmentation probability threshold (default from training config). |
-| `--seam-step`               | Section sampling step in pixels. |
-| `--fast-mode`               | Use the faster section-extraction path for online runs. |
-| `--no-profile-plots`        | Skip gap / flush PNG generation. |
+| `--seam-step`               | Section sampling step in pixels. Defaults to the precision-tuned value from `configs/gap_flush.yaml`. |
 | `--show-3d-viewer`          | Open an Open3D viewer on the result. |
 | `--save-3d-viewer-bundle`   | Export `viewer_bundle.npz` so the viewer can be reopened later. |
+
+The CLI runs in the precise measurement configuration only — reference
+extraction path and full profile-plot generation are always on. Speed /
+completeness trade-off switches exist in the Python API
+(`run_gap_flush_pipeline(fast_mode=..., save_profile_plots=...)`) for
+bench / internal use, but no command-line flag exposes them.
 
 Outputs (summary JSON, section CSV, optional PNGs and viewer bundle) are
 written under `outputs/pipeline/` by default; override with `--output-root`.

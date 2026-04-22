@@ -29,29 +29,6 @@ _BUILTIN_DEFAULTS: dict[str, float | int] = {
     "neighbor_radius_u": 2.16,
     "neighbor_height_tol": 0.096,
     "min_neighbors": 2,
-    "height_window_u": 2.5,
-    "height_outlier_tol": 0.12,
-    "continuity_gap_u": 2.5,
-    "continuity_gap_z": 0.12,
-    "min_segment_points": 6,
-    "bottom_band_height": 1.0,
-    "bottom_candidate_height_ratio": 0.18,
-    "bottom_span_weight": 2.0,
-    "bottom_count_weight": 0.12,
-    "bottom_flatness_weight": 4.0,
-    "bottom_low_weight": 1.5,
-    "bottom_min_span_ratio": 0.2,
-    "bottom_refine_height_tol": 0.08,
-    "bottom_refine_height_ratio": 0.18,
-    "bottom_refine_num_bins": 64,
-    "bottom_refine_min_bin_points": 6,
-    "bottom_refine_low_quantile": 0.2,
-    "bottom_refine_smooth_window": 5,
-    "bottom_refine_sigma_alpha": 2.5,
-    "bottom_refine_residual_alpha": 2.5,
-    "display_max_pointcloud_points": 40000,
-    "display_max_bottom_points": 12000,
-    "display_z_scale": 1.0,
     "top_surface_quantile": 0.90,
     "top_surface_band_height": 0.8,
     "top_surface_center_margin_ratio": 0.2,
@@ -121,29 +98,6 @@ class GapFlushParams:
     neighbor_radius_u: float = float(_CFG["neighbor_radius_u"])
     neighbor_height_tol: float = float(_CFG["neighbor_height_tol"])
     min_neighbors: int = int(_CFG["min_neighbors"])
-    height_window_u: float = float(_CFG["height_window_u"])
-    height_outlier_tol: float = float(_CFG["height_outlier_tol"])
-    continuity_gap_u: float = float(_CFG["continuity_gap_u"])
-    continuity_gap_z: float = float(_CFG["continuity_gap_z"])
-    min_segment_points: int = int(_CFG["min_segment_points"])
-    bottom_band_height: float = float(_CFG["bottom_band_height"])
-    bottom_candidate_height_ratio: float = float(_CFG["bottom_candidate_height_ratio"])
-    bottom_span_weight: float = float(_CFG["bottom_span_weight"])
-    bottom_count_weight: float = float(_CFG["bottom_count_weight"])
-    bottom_flatness_weight: float = float(_CFG["bottom_flatness_weight"])
-    bottom_low_weight: float = float(_CFG["bottom_low_weight"])
-    bottom_min_span_ratio: float = float(_CFG["bottom_min_span_ratio"])
-    bottom_refine_height_tol: float = float(_CFG["bottom_refine_height_tol"])
-    bottom_refine_height_ratio: float = float(_CFG["bottom_refine_height_ratio"])
-    bottom_refine_num_bins: int = int(_CFG["bottom_refine_num_bins"])
-    bottom_refine_min_bin_points: int = int(_CFG["bottom_refine_min_bin_points"])
-    bottom_refine_low_quantile: float = float(_CFG["bottom_refine_low_quantile"])
-    bottom_refine_smooth_window: int = int(_CFG["bottom_refine_smooth_window"])
-    bottom_refine_sigma_alpha: float = float(_CFG["bottom_refine_sigma_alpha"])
-    bottom_refine_residual_alpha: float = float(_CFG["bottom_refine_residual_alpha"])
-    display_max_pointcloud_points: int = int(_CFG["display_max_pointcloud_points"])
-    display_max_bottom_points: int = int(_CFG["display_max_bottom_points"])
-    display_z_scale: float = float(_CFG["display_z_scale"])
     top_surface_quantile: float = float(_CFG["top_surface_quantile"])
     top_surface_band_height: float = float(_CFG["top_surface_band_height"])
     top_surface_center_margin_ratio: float = float(_CFG["top_surface_center_margin_ratio"])
