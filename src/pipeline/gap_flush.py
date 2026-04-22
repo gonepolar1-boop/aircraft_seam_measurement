@@ -62,6 +62,7 @@ def run_gap_flush_pipeline(
             measurement_result=measurement_result,
             save_profile_plots=save_profile_plots,
             save_viewer_bundle=save_viewer_bundle,
+            outlier_sigma=float(params.outlier_sigma),
         )
     result["timing"] = timer.summary()
     if show_3d_viewer:

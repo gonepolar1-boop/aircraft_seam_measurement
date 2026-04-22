@@ -38,6 +38,7 @@ def save_pipeline_outputs(
     measurement_result: dict[str, Any] | None = None,
     save_profile_plots: bool = True,
     save_viewer_bundle: bool = False,
+    outlier_sigma: float | None = None,
 ) -> dict[str, str]:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -77,11 +78,13 @@ def save_pipeline_outputs(
             sections=measurement_result.get("sections", []),
             section_results=measurement_result.get("section_results", []),
             section_profile=result["section_profile"],
+            outlier_sigma=outlier_sigma,
         )
         save_section_debug_detail_plots(
             save_dir=section_debug_dir,
             section_results=measurement_result.get("section_results", []),
             section_profile=result["section_profile"],
+            outlier_sigma=outlier_sigma,
         )
     if save_viewer_bundle and measurement_result is not None:
         save_gap_flush_viewer_bundle(
@@ -193,6 +196,7 @@ def save_depth_overlay_plot(
     sections: list[dict[str, Any]],
     section_results: list[dict[str, Any]],
     section_profile: list[dict[str, Any]],
+    outlier_sigma: float | None = None,
 ) -> None:
     import matplotlib.pyplot as plt
 
@@ -210,7 +214,9 @@ def save_depth_overlay_plot(
     z_max = float(np.max(z_map[finite_mask]))
     if z_max > z_min:
         display[finite_mask] = (z_map[finite_mask] - z_min) / (z_max - z_min)
-    anomaly_indices = _collect_anomaly_sample_indices(section_results, section_profile)
+    anomaly_indices = _collect_anomaly_sample_indices(
+        section_results, section_profile, outlier_sigma=outlier_sigma,
+    )
     section_result_index = {int(item.get("sample_index", -1)): item for item in section_results}
 
     fig, ax = plt.subplots(figsize=(9.5, 7.2))
@@ -265,10 +271,13 @@ def save_section_debug_detail_plots(
     save_dir: str | Path,
     section_results: list[dict[str, Any]],
     section_profile: list[dict[str, Any]],
+    outlier_sigma: float | None = None,
 ) -> None:
     import matplotlib.pyplot as plt
 
-    anomaly_indices = set(_collect_anomaly_sample_indices(section_results, section_profile))
+    anomaly_indices = set(_collect_anomaly_sample_indices(
+        section_results, section_profile, outlier_sigma=outlier_sigma,
+    ))
     if not anomaly_indices:
         return
 
@@ -345,12 +354,20 @@ def _scatter_points(ax: Any, points: dict[str, Any], color: str, alpha: float, l
     ax.scatter(points["u"], points["z"], s=size, c=color, alpha=alpha, label=label)
 
 
-def _collect_anomaly_sample_indices(section_results: list[dict[str, Any]], section_profile: list[dict[str, Any]]) -> list[int]:
-    # Read the outlier threshold from the gap/flush YAML config. Falling
-    # back to GapFlushParams' default keeps this callable even if outputs
-    # is imported before params has been configured explicitly.
-    from .seam_measurement.params import GapFlushParams  # noqa: PLC0415
-    sigma = float(GapFlushParams().outlier_sigma)
+def _collect_anomaly_sample_indices(
+    section_results: list[dict[str, Any]],
+    section_profile: list[dict[str, Any]],
+    *,
+    outlier_sigma: float | None = None,
+) -> list[int]:
+    # ``outlier_sigma`` is taken from GapFlushParams.outlier_sigma (yaml-
+    # backed) when the caller does not supply one, so library users can
+    # still call this without plumbing anything.  Direct callers should
+    # pass the value explicitly to keep the stats lookup pure.
+    if outlier_sigma is None:
+        from .seam_measurement.params import GapFlushParams  # noqa: PLC0415
+        outlier_sigma = float(GapFlushParams().outlier_sigma)
+    sigma = float(outlier_sigma)
 
     anomaly = []
     gap_values = np.asarray([float(item.get("gap", np.nan)) for item in section_profile if bool(item.get("valid", False)) and np.isfinite(item.get("gap", np.nan))], dtype=np.float32)

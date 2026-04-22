@@ -339,4 +339,47 @@ Sample 1, precision config (seam_step=1, 1893 section), 均为 1 次 warmup
 - **P2 refine 早停**：实测 refine 本身开销就小（62 ms），早停节不出
   可测量时间，精度也无影响 → 回退。
 
+---
+
+## P10 — normal 路径 `extract_sections` 并行（C# 宿主配合）
+
+P6 给 `extract_sections_fast` 加了 ThreadPoolExecutor；normal 路径
+（`extract_sections`）仍是单线程，非 fast-mode 调用时会成为瓶颈。
+随着 C# 上位机取消 Fast Mode / Skip Profile Plots 两个开关（始终走
+normal 路径 + 全套图），这里也做同样的并行改造。
+
+| 项 | 改前 | 改后 |
+|---|---|---|
+| Normal-mode compute_gap_flush（单线程参考） | ≈ 60 s | ≈ 38 s |
+| Normal-mode 全流程（含 save_outputs） | — | **72 - 76 s 中位数 73.9 s** |
+
+C# 宿主侧改动（未入 git，保留在本地 `_pre_p9_backup/`）：
+- `PipelineLaunchDialog.cs`：删除 `m_FastModeCheckBox` / `m_SkipProfilePlotsCheckBox` 及相关 constructor 参数与 label；对话框高度缩到 310。
+- `MainFrm.cs`：删除 `SessionPipelineFastMode / SessionPipelineSkipProfilePlots` 字段与所有相关方法形参和 stdin 开关拼接。
+- `PipelineResultWindow.cs`：section grid 列头改 "Gap (mm)" / "Flush (mm)"。
+- 重新编译：`MPSizectorS_ControlCenter.exe`（`Release` / AnyCPU，MSBuild v4.0）。
+
+尝试过**并行化 `save_section_debug_detail_plots`**（92 张 PNG × ~220 ms
+matplotlib 绘图）——ThreadPool 反而让它从 20s → 24s，matplotlib 渲染
+是 GIL 锁死的 Python 热路径，线程争抢得不偿失。**回退**，保持单线程。
+
+---
+
+## 收尾 Polish（最终版本前）
+
+三个小清理（非必须但规整）：
+
+1. **RANSAC 单元测试**：新增 `tests/test_robust_line_fit.py`（4 个用例）
+   覆盖"干净点云/带外点/小点集 fallback/u 值全相同退化"——之前
+   `_robust_line_fit` 只有集成测试覆盖，现在有单独测试。
+2. **`_collect_anomaly_sample_indices` 显式 `outlier_sigma` 参数**：
+   `save_pipeline_outputs` → `save_depth_overlay_plot` /
+   `save_section_debug_detail_plots` → `_collect_anomaly_sample_indices`
+   整条链允许显式传参；默认 fallback 仍从 `GapFlushParams()` 拿，
+   不破坏向后兼容。`gap_flush.py` 调用处现在从 params 直接传入，
+   避免了 outputs.py 内部再次实例化 `GapFlushParams()` 的隐式依赖。
+3. **文档**：本节；log 从 P9 截至收尾 Polish 现状连贯。
+
+最终测试：**59 passed**（55 + 4 RANSAC 新增）。
+
 

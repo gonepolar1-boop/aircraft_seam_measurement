@@ -89,12 +89,15 @@ in `src/seam_training/config.json`.
 
 ## Tests
 
-A small pytest suite covers the pure-numpy utilities (reference-frame
-geometry, ASCII-PCD loader). It runs without torch / opencv / open3d so it
-is safe to execute in a minimal CI environment.
+A pytest suite covers the pure-numpy / scipy measurement utilities
+(reference-frame geometry, ASCII-PCD loader, 3D plane fit and
+scheme-B gap/flush decomposition, RANSAC line fit, count_neighbors
+dispatch). It runs without torch / open3d and also without cv2
+(the few cv2-dependent tests are gated by ``pytest.importorskip``),
+so it is safe to execute in a minimal CI environment.
 
 ```bash
-pip install numpy pytest
+pip install numpy scipy pyyaml pytest opencv-python-headless
 pytest
 ```
 
