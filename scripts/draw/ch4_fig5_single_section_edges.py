@@ -17,6 +17,8 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from _style import PALETTE, THESIS_FIGURES_DIR, savefig  # noqa: E402
+
 from pipeline.seam_mapping.inference import predict_mask_from_point_map  # noqa: E402
 from pipeline.seam_mapping.io import load_point_map  # noqa: E402
 from pipeline.seam_measurement import GapFlushParams  # noqa: E402
@@ -24,8 +26,6 @@ from pipeline.seam_measurement.bottom import compute_section_bottom  # noqa: E40
 from pipeline.seam_measurement.measurements import compute_section_gap_flush  # noqa: E402
 from pipeline.seam_measurement.sections import extract_seam_direction, extract_sections  # noqa: E402
 from pipeline.seam_measurement.top_surface import detect_top_surface_edges  # noqa: E402
-
-from _style import PALETTE, THESIS_FIGURES_DIR, savefig  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:

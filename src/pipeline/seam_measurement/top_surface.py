@@ -14,7 +14,7 @@ from .helpers import (
     subset_points,
 )
 from .params import GapFlushParams
-from .types import LineFit, PlotPoints, TopSurfacePayload
+from .types import LineFit, TopSurfacePayload
 
 
 def detect_top_surface_edges(section: dict[str, Any], params: GapFlushParams) -> TopSurfacePayload:

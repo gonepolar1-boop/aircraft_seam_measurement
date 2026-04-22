@@ -13,7 +13,6 @@ import pytest
 
 from pipeline.seam_measurement.geometry import fit_plane_3d, measure_gap_flush_3d
 
-
 # ---------------------------------------------------------------------------
 # fit_plane_3d
 # ---------------------------------------------------------------------------

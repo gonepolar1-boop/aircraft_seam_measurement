@@ -18,11 +18,11 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from _style import PALETTE, THESIS_FIGURES_DIR, savefig  # noqa: E402
+
 from pipeline.seam_mapping.inference import build_depth_image_from_point_map, predict_mask_from_point_map  # noqa: E402
 from pipeline.seam_mapping.io import load_point_map  # noqa: E402
 from pipeline.seam_measurement.sections import extract_seam_direction  # noqa: E402
-
-from _style import PALETTE, THESIS_FIGURES_DIR, savefig  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:

@@ -10,7 +10,14 @@ from tqdm import tqdm
 from .data import build_datasets
 from .model import SegmentationCriterion, build_model
 from .preview import save_epoch_previews
-from .utils import REAL_ONLY_DEFAULTS, build_artifact_paths, build_cfg, reset_training_artifacts, set_seed, setup_logging
+from .utils import (
+    REAL_ONLY_DEFAULTS,
+    build_artifact_paths,
+    build_cfg,
+    reset_training_artifacts,
+    set_seed,
+    setup_logging,
+)
 
 METRIC_KEYS = ("train_losses",)
 # Schema shared with scripts/train/run_loocv_experiments.py so downstream

@@ -11,7 +11,6 @@ import torch.nn.functional as F
 from ..seam_training.model import build_model
 from ..seam_training.utils import MODEL_INPUT_SIZE, REAL_ONLY_DEFAULTS
 
-
 _MODEL_CACHE: Final[dict[tuple[str, str, str], torch.nn.Module]] = {}
 
 

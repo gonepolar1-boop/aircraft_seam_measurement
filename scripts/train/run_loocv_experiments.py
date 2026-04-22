@@ -14,7 +14,6 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
@@ -24,7 +23,6 @@ from seam_training.data import SeamDataset
 from seam_training.model import SegmentationCriterion, build_model
 from seam_training.train import load_checkpoint, save_checkpoint
 from seam_training.utils import MODEL_INPUT_SIZE, REAL_ONLY_DEFAULTS, build_patch_sampling_cfg, set_seed
-
 
 HISTORY_KEYS = (
     "train_losses",

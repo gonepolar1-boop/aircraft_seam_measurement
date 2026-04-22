@@ -7,8 +7,6 @@ they run in the minimal CI environment.
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 import pytest
 

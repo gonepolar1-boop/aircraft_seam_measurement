@@ -19,9 +19,9 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from pipeline.gap_flush import run_gap_flush_pipeline  # noqa: E402
-
 from _style import PALETTE, THESIS_FIGURES_DIR, savefig  # noqa: E402
+
+from pipeline.gap_flush import run_gap_flush_pipeline  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:

@@ -9,7 +9,7 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from pipeline.viewer3d import show_gap_flush_open3d_viewer_from_bundle
+from pipeline.viewer3d import show_gap_flush_open3d_viewer_from_bundle  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:

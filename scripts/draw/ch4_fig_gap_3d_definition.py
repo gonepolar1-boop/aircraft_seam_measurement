@@ -26,14 +26,13 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from _style import PALETTE, THESIS_FIGURES_DIR, savefig  # noqa: E402
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401,E402 - registers 3d projection
 
 from pipeline.seam_mapping.inference import build_depth_image_from_point_map, predict_mask_from_point_map  # noqa: E402
 from pipeline.seam_mapping.io import load_point_map  # noqa: E402
 from pipeline.seam_measurement.core import compute_gap_flush  # noqa: E402
 from pipeline.seam_measurement.params import GapFlushParams  # noqa: E402
-
-from _style import PALETTE, THESIS_FIGURES_DIR, savefig  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -216,13 +215,11 @@ def main() -> None:
         ax_c.plot(xs, ys, zs, color=colour, lw=1.1, alpha=0.75)
 
     # Three-way decomposition: gap (cross-seam) + along-seam residual + flush (normal).
-    parallel_signed = float(measurement.get("parallel_component_signed", 0.0))
     delta_vec = right_xyz - left_xyz
     t_along = np.asarray(measurement.get("seam_tangent_along_3d", [np.nan] * 3), dtype=np.float32)
     t_cross = np.asarray(measurement.get("seam_tangent_cross_3d", [np.nan] * 3), dtype=np.float32)
     along_comp = float(np.dot(delta_vec, t_along)) if np.all(np.isfinite(t_along)) else 0.0
     cross_comp = float(np.dot(delta_vec, t_cross)) if np.all(np.isfinite(t_cross)) else 0.0
-    flush_signed = parallel_signed
     gap_along_res = float(measurement.get("gap_along_residual_mm", float("nan")))
 
     # Chain the three legs from left_xyz:

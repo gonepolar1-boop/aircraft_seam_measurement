@@ -22,7 +22,6 @@ if str(SRC_ROOT) not in sys.path:
 
 from _style import PALETTE, THESIS_FIGURES_DIR, savefig  # noqa: E402
 
-
 METRIC_KEYS = ("train_losses", "val_losses", "val_dice", "val_iou", "val_precision", "val_recall")
 
 

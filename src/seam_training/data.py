@@ -1,5 +1,6 @@
-from pathlib import Path
 import random
+from pathlib import Path
+
 import cv2
 import numpy as np
 import torch

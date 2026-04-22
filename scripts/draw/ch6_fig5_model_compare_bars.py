@@ -21,7 +21,6 @@ if str(SRC_ROOT) not in sys.path:
 
 from _style import PALETTE, THESIS_FIGURES_DIR, savefig  # noqa: E402
 
-
 DEFAULT_RUNS = (
     ("U-Net", PROJECT_ROOT / "outputs" / "model" / "03312131_loocv_unet" / "loocv_summary.json"),
     ("Attention U-Net", PROJECT_ROOT / "outputs" / "model" / "03301416_loocv_attention_unet" / "loocv_summary.json"),

@@ -23,7 +23,6 @@ import matplotlib
 import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 
-
 # Output path every script writes to unless the caller overrides it.
 THESIS_FIGURES_DIR = Path(__file__).resolve().parents[2] / "outputs" / "thesis_figures"
 

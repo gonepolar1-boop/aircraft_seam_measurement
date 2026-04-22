@@ -21,10 +21,10 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from _style import THESIS_FIGURES_DIR, savefig  # noqa: E402
+
 from seam_training.model import build_model  # noqa: E402
 from seam_training.utils import MODEL_INPUT_SIZE, REAL_ONLY_DEFAULTS  # noqa: E402
-
-from _style import THESIS_FIGURES_DIR, savefig  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:

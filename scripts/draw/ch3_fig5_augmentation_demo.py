@@ -21,11 +21,10 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from seam_training.data import SeamAugmenter  # noqa: E402
-from seam_training.utils import AUGMENTATION_DEFAULTS  # noqa: E402
-
 from _style import THESIS_FIGURES_DIR, savefig  # noqa: E402
 
+from seam_training.data import SeamAugmenter  # noqa: E402
+from seam_training.utils import AUGMENTATION_DEFAULTS  # noqa: E402
 
 AUGMENTATIONS = (
     ("原始", None),

@@ -27,8 +27,6 @@ def compute_section_gap_flush(section_result: dict[str, Any]) -> SectionMeasurem
 
     left_point_xy = _extract_edge_xy(left_edge)
     right_point_xy = _extract_edge_xy(right_edge)
-    u_l, z_l = float(left_point_xy[0]), float(left_point_xy[1])
-    u_r, z_r = float(right_point_xy[0]), float(right_point_xy[1])
 
     # Legacy 2D measurements kept as diagnostic fields so downstream
     # consumers (and the thesis figures) can compare against the prior
