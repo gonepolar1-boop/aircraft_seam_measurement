@@ -49,24 +49,38 @@ def extract_sections(
     if ctx is None:
         return []
 
-    sections: list[dict[str, Any]] = []
-    for sample_index, sample_t in enumerate(ctx["sample_positions"]):
-        slab_mask = np.abs(ctx["component_t"] - sample_t) <= float(ctx["params"].section_half_length_px)
+    sample_positions = ctx["sample_positions"]
+    half_length = float(ctx["params"].section_half_length_px)
+
+    def _build_one(sample_index: int) -> dict[str, Any] | None:
+        sample_t = float(sample_positions[sample_index])
+        slab_mask = np.abs(ctx["component_t"] - sample_t) <= half_length
         if not np.any(slab_mask):
-            continue
+            return None
         seam_pixels_xy = ctx["mask_pixels"][slab_mask].astype(np.float32)
         slab_component_n = ctx["component_n"][slab_mask]
-        # Background points via boolean mask against the full pixel grid.
-        center_v_needed: list[float] = []  # populated after center_xy is known
-        section_payload = _build_section_from_slab(
+        return _build_section_from_slab(
             ctx=ctx,
             sample_index=sample_index,
             seam_pixels_xy=seam_pixels_xy,
             slab_component_n=slab_component_n,
             background_selector=_slab_mask_selector,
         )
-        if section_payload is not None:
-            sections.append(section_payload)
+
+    # ctx is read-only after _prepare_section_context; the per-sample
+    # boolean mask selection is independent for each sample, so parallel
+    # execution is safe. Mirrors the P6 change already applied to
+    # extract_sections_fast.
+    payloads: list[dict[str, Any] | None] = [None] * len(sample_positions)
+    if _SECTION_EXTRACT_THREADS > 1 and len(sample_positions) > 0:
+        with ThreadPoolExecutor(max_workers=_SECTION_EXTRACT_THREADS) as pool:
+            futures = {pool.submit(_build_one, i): i for i in range(len(sample_positions))}
+            for future, i in futures.items():
+                payloads[i] = future.result()
+    else:
+        for i in range(len(sample_positions)):
+            payloads[i] = _build_one(i)
+    sections = [p for p in payloads if p is not None]
     return sections
 
 
