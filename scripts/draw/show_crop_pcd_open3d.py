@@ -6,13 +6,14 @@ from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
-from src.pipeline.seam_mapping.io import load_point_map
+from pipeline.seam_mapping.io import load_point_map  # noqa: E402
 
-DEFAULT_PCD_PATH = Path(r"D:\MyProgram\aircraft_seam_measurement\data\process\manual_crop\1\crop.pcd")
+DEFAULT_PCD_PATH = PROJECT_ROOT / "data" / "process" / "manual_crop" / "1" / "crop.pcd"
 
 
 def parse_args() -> argparse.Namespace:
